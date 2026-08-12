@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	<title>BadNet v5</title>
+	<link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+	<meta name="description" content="BadNet, logiciel de gestion de compétitions de badminton pour les ligues, clubs et comités">
+	<meta property="og:image" content="https://badnet.fr/Template/Img/background_connexion.jpg">
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="627">
+	<meta property="og:description" content="Gérez votre compétitions de badminton en toute simplicité !">
+	<meta property="og:title" content="BadNet">
+
+
+	<!-- Global stylesheets -->
+	<link href="https://fonts.googleapis.com/css?family=Roboto:400,300,100,500,700,900">
+
+	<link href="/assets/project.css?ts=202407241305" rel="stylesheet" type="text/css">
+
+	<!-- /global stylesheets -->
+
+
+	<!-- Core JS files -->
+	<script src="/assets/index.js?ts=202407241305"></script>
+	<script src="/vendor/iclick/ic/vendor-lib/Plugin/uniform.min.js"></script>
+
+</head>
+
+<body class="connexion">
+
+<div class="page-content">
+
+	<!-- Main content -->
+	<div class="content-wrapper" id="wrapper">
+
+		<div class="container mt-2">
+			<div class="row">
+				<div class="col-12">
+					<h1 class="h1 display-5 text-center mt-2 text-white font-weight-bold">Bienvenue sur <br> BadNet !</h1>
+				</div>
+			</div>
+		</div>
+
+
+		<div class="container">
+			<div class="row align-items-center">
+				<div class="col-12 col-lg-5">
+
+					<div class="bg-light opacity-75 py-3 px-4 my-5 text-center rounded-top-left">
+						<p class="font-weight-bold text-secondary">Double authentification</p>
+
+						<p>Pour des raisons de sécurité, une double authentification par mail a été mise en place.</p>
+
+						<p>Si vous êtes plusieurs à utiliser un même compte BadNet, utiliser les modules privilèges pour donner des accès à d'autres comptes BadNet.</p>
+
+						<p>Elle sert à sécuriser vos données personnelles et votre argent disponible dans votre portefeuille BadNet.</p>
+
+						<p>Elle ne sera pas supprimée et ne peut pas être désactivée, donc il ne sert à rien d'ouvrir un ticket pour demander sa désactivation.</p>
+
+						<p class="mt-2"><a href="https://blog.i-click.fr/assistance/faq/pourquoi-la-double-authentification" target="_blank">Cliquez ici pour en savoir plus sur la double authentification et les modules privilèges.</a></p>
+					</div>
+
+				</div>
+
+				<div class="col-12 col-lg-7">
+
+					<!-- Content area -->
+					<div class="content d-flex justify-content-center align-items-center">
+
+						<div class="login-form card mb-0">
+							<div class="card-body bg-main">
+								<div class="brand text-center mb-3">
+									<a href="/"><img class="logo" src="/Template/Img/Logo/BadNet_Long_blanc.svg" alt="BadNet"></a>
+								</div>
+
+								<div id="card_target">
+									<div class="text-center mb-3">
+										<span class="d-block text-grey-700">Authentification double facteur</span>
+									</div>
+
+									<form  method="post" action="index.php" data-ic_t="card_target" class="ic-form" data-ic_cb="noValidPopup">
+										<input name="ic_a" type="hidden" value="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb">
+										<input name="ic_ajax" type="hidden" value="1">
+
+
+										<p>Afin de sécuriser l'accès à votre compte, un code à 6 chiffre a été envoyé par mail à l'addresse ex****@example.com.</p>
+										<p>Saisissez-le ci-dessous pour vous connecter.</p>
+
+
+
+										<div class="mt-2 form-group form-group-feedback form-group-feedback-left">
+											<input type="number" id="code" name="code" class="form-control" placeholder="Code reçu par email"
+												   maxlength="6"
+												   value="" required autofocus>
+											<div class="form-control-feedback">
+												<i class="icon-user text-muted"></i>
+											</div>
+										</div>
+
+
+
+
+
+										<div class="form-group">
+											<button type="submit" class="btn btn-dark btn-block">Valider le code<i
+													class="icon-circle-right2 ml-2"></i></button>
+										</div>
+
+
+
+									</form>
+								</div>
+							</div>
+						</div>
+
+
+					</div>
+					<!-- /content area -->
+				</div>
+			</div>
+		</div>
+
+
+	</div>
+	<!-- /main content -->
+
+</div>
+
+</body>
+</html>

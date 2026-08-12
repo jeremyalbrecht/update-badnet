@@ -1,0 +1,43 @@
+name: Image Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'function/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'func.yaml'
+
+jobs:
+  tests:
+    uses: ./.github/workflows/tests.yml
+
+  container:
+    needs: tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Install func CLI
+        run: |
+          curl -sL https://github.com/knative/func/releases/latest/download/func_linux_amd64 \
+            -o /usr/local/bin/func
+          chmod +x /usr/local/bin/func
+
+      - name: Build and push
+        run: func build --builder-image ghcr.io/knative/builder-jammy-base:latest --platform linux/amd64 --push
+
+      - name: Tag with git SHA
+        run: |
+          docker tag docker.io/jeremyalbrecht/update-badnet:latest \
+            jeremyalbrecht/update-badnet:${{ github.sha }}
+          docker push jeremyalbrecht/update-badnet:${{ github.sha }}

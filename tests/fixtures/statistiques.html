@@ -1,0 +1,42 @@
+<!--
+Trimmed from a real /statistiques response captured 2026-08-11. Charts, data
+tables and member rows removed; club name replaced. The export controls are
+verbatim, including the duplicate id="btnXls" on two different buttons.
+
+Note the two parameter conventions in play:
+  - nav links carry a data-ic_url JSON blob whose "url" holds a query string
+  - the export buttons carry flat data-season / data-assoid / data-popup attrs
+Both must be turned into query parameters.
+-->
+<div class="content-wrapper" id="wrapper">
+
+<input type="hidden" id="action_file_size" data-ic_a="c1c2bc3d47e84fa57078d8aa05aef446">
+
+<a href="#" class="nav-link ic-click active" data-ic_t="wrapper" data-ic_a="8a500ade7445616e671408c7af41031f" data-ic_url="{&quot;url&quot;:&quot;statistiques&quot;}">
+    <i class="icon-pie-chart7"></i><span>Statistiques</span>
+</a>
+
+<form enctype="multipart/form-data" data-ic_datatype="json" class="ic-form needs-validation" action="index.php"><input id="ic_a" name="ic_a" type="hidden" value="8a500ade7445616e671408c7af41031f">
+<input id="ic_ajax" name="ic_ajax" type="hidden" value="1">
+<div id="div_lstSeason" class="form-group row"><label for="lstSeason" class="col-form-label col-sm-4">Choisir une saison : </label>
+<div class="col-sm-8"><select id="lstSeason" name="lstSeason" class="form-control ic-change select2-hidden-accessible" data-ic_select_search="Infinity" data-ic_t="wrapper" data-ic_a="8a500ade7445616e671408c7af41031f" data-ic_ajax="1" data-select2-id="lstSeason" tabindex="-1" aria-hidden="true"><option value="-1">---</option>
+<option value="19">2024-2025</option>
+<option value="20" selected>2025-2026</option>
+</select>
+</div>
+</div>
+</form>
+
+<button type="button" class="btn  ic-click btn-light mt-2" data-ic_a="52d5f3c3e290d7281d5cca731c528016" data-ic_ajax="1" data-popup="1" data-season="20" data-assoid="564"><span>Télécharger la liste des joueurs par tournoi</span></button>
+
+<fieldset><legend class="font-weight-semibold text-uppercase font-size-sm"><i class="icon-pie-chart5 mr-2"></i>
+Compétitions et matchs des licenciés de Club Exemple sur les tournois individuels pour la saison 2025-2026<a class="float-right text-default" data-toggle="collapse" data-target="#b-statplayers" aria-expanded="true" role="button"><i class="icon-circle-down2"></i>
+</a>
+</legend>
+</fieldset>
+<div id="b-statplayers" class="collapse show"><button id="btnXls" type="button" class="btn btn-primary ic-click mb-2" data-ic_a="2574f4e5b7ff8ee720a743c56892b33f" data-ic_ajax="1" data-season="20" data-assoid="564" data-popup="1"><span>Excel des licenciés</span></button>
+<button id="btnXls" type="button" class="btn btn-primary ic-click mb-2" data-ic_a="dd9a33fae336d129eb0d2b36a3dcc116" data-ic_ajax="1" data-season="20" data-assoid="564" data-popup="1"><span>Excel du détail des tournois des licenciés</span><i class="icon-info22 text-info ml-1" title="" data-tooltip="1" data-placement="right" data-original-title="Pour chaque joueur, affiche chaque tournoi pour lequel il a participé ainsi que ses frais d'inscription sur la compétition."></i>
+</button>
+</div>
+
+</div>

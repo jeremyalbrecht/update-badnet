@@ -1,0 +1,33 @@
+
+# Use the .funcignore file to exclude files which should not be
+# tracked in the image build. To instruct the system not to track
+# files in the image build, add the regex pattern or file information
+# to this file.
+
+# Dev tooling
+.venv/
+.idea/
+.claude/
+.pytest_cache/
+.func/blob-cache/
+.func/local.yaml
+.func/runs/
+
+# Secrets & credentials
+.env
+key.json
+*.har
+
+# Dev/test files
+tests/
+
+# Infra (not needed in image)
+.github/
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+
+# Docs
+CLAUDE.md

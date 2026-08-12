@@ -1,0 +1,50 @@
+# $schema: https://raw.githubusercontent.com/knative/func/3804dc9b/schema/func_yaml-schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/knative/func/3804dc9b/schema/func_yaml-schema.json
+specVersion: 0.36.0
+name: update-badnet
+runtime: python
+registry: docker.io/jeremyalbrecht
+image: docker.io/jeremyalbrecht/update-badnet:latest
+namespace: augny-badminton
+created: 2026-06-02T08:37:16.948834+02:00
+build:
+  builderImages:
+    host: ghcr.io/knative/builder-jammy-base:latest
+    pack: ghcr.io/knative/builder-jammy-base:latest
+  builder: pack
+run:
+  envs:
+  - name: BADNET_USERNAME
+    value: '{{ env:BADNET_USERNAME }}'
+  - name: BADNET_PASSWORD
+    value: '{{ env:BADNET_PASSWORD }}'
+  # Mailbox receiving the Badnet 2FA code. Must be a Gmail app password —
+  # a service account cannot read a consumer Gmail inbox.
+  - name: GMAIL_ADDRESS
+    value: '{{ env:BADNET_USERNAME }}'
+  - name: GMAIL_APP_PASSWORD
+    value: '{{ env:GMAIL_APP_PASSWORD }}'
+  - name: GOOGLE_SHEETS_ID
+    value: '{{ env:GOOGLE_SHEETS_ID }}'
+  - name: GOOGLE_SHEET_NAME
+    value: '{{ env:GOOGLE_SHEET_NAME }}'
+  - name: GOOGLE_SERVICE_ACCOUNT_JSON
+    value: '{{ env:GOOGLE_SERVICE_ACCOUNT_JSON }}'
+  # Seconds to wait for the 2FA email before giving up.
+  - name: BADNET_2FA_TIMEOUT
+    value: "120"
+  # Set to DEBUG to trace every request/response when a scrape breaks.
+  - name: LOG_LEVEL
+    value: INFO
+  # Optional. Unset means "whatever season the export button advertises", i.e.
+  # the current one. Set it to pull a past season: the value is the option
+  # value of the site's season picker (20 = 2025-2026, 19 = 2024-2025, …).
+  - name: BADNET_SEASON
+    value: ""
+deploy:
+  namespace: augny-badminton
+  image: docker.io/jeremyalbrecht/update-badnet:latest
+  options:
+    scale:
+      min: 0
+      max: 1

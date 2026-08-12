@@ -1,0 +1,540 @@
+Delivered-To: club@example.com
+Received: by 2002:a05:7010:2c82:b0:52f:815d:9222 with SMTP id fz2csp1108857mdb;
+        Tue, 11 Aug 2026 12:41:05 -0700 (PDT)
+X-Received: by 2002:a05:6000:299b:20b0:474:3b3b:5e5f with SMTP id ffacd0b85a97d-4814fd76adfmr3740290f8f.16.1786477265564;
+        Tue, 11 Aug 2026 12:41:05 -0700 (PDT)
+ARC-Seal: i=1; a=rsa-sha256; t=1786477265; cv=none;
+        d=google.com; s=arc-20260327;
+        b=kukvJlRhBDF5toAPYx51iUIoYtJHllIqfAB1bKbVOG47iYsZg7nQ5lt4lSE+LpqpaB
+         /nrWfXxraRix+xuD1M1r3yTjxQ6D4i6DusE8ydwIiqPqIAlnA28K/0uTJKeM+eeAf7ml
+         iCbSK8WXm2xsa+gKhwoYThB7grcDVi6pyW2wi+bkRY+/z2sV3oyvDLe6zHf/+bRLlZsZ
+         6VA2m65uA78ooTe5LTbU+OZKRhOymK6Jyuedj0/Jj2hX+bzY5UprFTnCB92kADHUQWU5
+         OPbe0rsmfIEHZNi1lu8+svjhr7YeZ17E82epYkrRLMkFmOhPaIob9Pa6UMdFcdtPmen2
+         VVdg==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20260327;
+        h=content-transfer-encoding:mime-version:message-id:subject:reply-to
+         :from:to:date:dkim-signature;
+        bh=FQL1jzbUPokEgS73K6O+bZ3DqzYsFiTLKktvLorlNPM=;
+        fh=O9zB0yrshbQjXrTWhFCgvP2Usa/UEvS9wZEU9/3cB/g=;
+        b=F6Jf64zLaKcQGGLTWtNxup0Cn6L1/8Lh3L/CauDFndh3lO8Sj97RiLvNUxT/bHIqf2
+         fAhIp2HzTh+Fdkg90EdSNA90T8fFcMBl4EluLZlnwzf9xi3byCQxwyjYDUkTVrbkRRW9
+         5XZbtT6YVg52KfDjbVidRDDIOnv+awAJCR64toHzMaduISBgbTFXY2CIb+CqsuWD6sXd
+         HEzzZmw0ztfab9LZx0/Qhuj1dg8M7HGyV3lZ9KjkS2QtSh261jzrq0qg0kjin1Cp3oe8
+         r+nShE8Qu+B+uPJ0uh/zSATf6nP0JXUMLjMBDemygzv4xenNH/rAmDsKa46BBX4cO79a
+         4oGw==;
+        dara=google.com
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@badnet.fr header.s=dkim header.b=Oz9TH86b;
+       spf=pass (google.com: domain of contact@badnet.fr designates 188.165.216.208 as permitted sender) smtp.mailfrom=contact@badnet.fr;
+       dmarc=pass (p=QUARANTINE sp=NONE dis=NONE) header.from=badnet.fr
+Return-Path: <contact@badnet.fr>
+Received: from mail.i-click.fr (mail.i-click.fr. [188.165.216.208])
+        by mx.google.com with ESMTPS id ffacd0b85a97d-48150d96cd0si474045f8f.339.2026.08.11.12.41.05
+        for <club@example.com>
+        (version=TLS1_3 cipher=TLS_AES_256_GCM_SHA384 bits=256/256);
+        Tue, 11 Aug 2026 12:41:05 -0700 (PDT)
+Received-SPF: pass (google.com: domain of contact@badnet.fr designates 188.165.216.208 as permitted sender) client-ip=188.165.216.208;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@badnet.fr header.s=dkim header.b=Oz9TH86b;
+       spf=pass (google.com: domain of contact@badnet.fr designates 188.165.216.208 as permitted sender) smtp.mailfrom=contact@badnet.fr;
+       dmarc=pass (p=QUARANTINE sp=NONE dis=NONE) header.from=badnet.fr
+Received: from [127.0.0.1] (localhost [127.0.0.1]) by localhost (Mailerdaemon) with ESMTPSA id 8DFD5248FB6B
+	for <club@example.com>; Tue, 11 Aug 2026 21:41:04 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=badnet.fr; s=dkim;
+	t=1786477264;
+	h=from:reply-to:subject:date:message-id:to:mime-version:content-type:
+	 content-transfer-encoding; bh=FQL1jzbUPokEgS73K6O+bZ3DqzYsFiTLKktvLorlNPM=;
+	b=Oz9TH86brgHKuV8xwru2UclHWjXua8UvJNqg5qD2IDvVnGWHBUYicEX+wfKv7SCNkS+Kz3
+	kWMMkIldMROgfKDfSA2PygxAmdnruwFz5em1767jALFyDviU30+EYo0qZu5UZzi1A8ltYC
+	0ro0juwc6jTMp1gOI89GhAhBrbTH328kP0AIgEWdlkTUiFlRFupY2KlVAjWKZ3BkIUxcTI
+	NUxo6qtDKbkPO9j/5R/irDUYKBELpxvMd3Jo6Z6wsaOZ5z+8fjN620zX21ab4aNvkye4PB
+	Ly+dNJDih5CeyKQdNgSMRZ0bfyQ6jw1ti1zmyWHvb4wrJXGCp32giN8SgOUD2g==
+Date: Tue, 11 Aug 2026 21:41:04 +0200
+To: club@example.com
+From: BadNet <contact@badnet.fr>
+Reply-To: contact@badnet.fr
+Subject: [BadNet] Code authentification BadNet
+Message-ID: <F6XaAUb9ueWHnTKznxwh58YDErBdlCsT7KNegCbOX4A@badnet.fr>
+MIME-Version: 1.0
+Content-Type: multipart/alternative;
+ boundary="b1=_F6XaAUb9ueWHnTKznxwh58YDErBdlCsT7KNegCbOX4A"
+Content-Transfer-Encoding: 8bit
+X-Last-TLS-Session-Version: TLSv1.3
+
+--b1=_F6XaAUb9ueWHnTKznxwh58YDErBdlCsT7KNegCbOX4A
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml"
+      xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Code authentification BadNet</title>
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <!--[if gte mso 9]>
+    <xml>
+        <o:OfficeDocumentSettings>
+            <o:AllowPNG/>
+            <o:PixelsPerInch>96</o:PixelsPerInch>
+        </o:OfficeDocumentSettings>
+    </xml><![endif]-->
+</head>
+<body>
+
+
+<style type="text/css">
+
+    table, td, p, a, span, h1, h2 {
+        font-family: 'Lato', 'Helvetica', sans-serif;
+        font-size: 14px;
+        line-height: 1.3em;
+    }
+
+    h1[class=title] {
+        font-family: 'Lato', 'Helvetica', sans-serif;
+        line-height: 1em;
+        font-size: 20px !important;
+        letter-spacing: 2px;
+        color: #222222;
+        font-weight: 700;
+    }
+
+    p[class=custom-paragraphe] {
+        font-family: 'Lato', 'Helvetica', sans-serif;
+        font-size: 14px;
+        line-height: 1.3em;
+        margin: 0 auto;
+    }
+    p {
+        padding: 8px 0;
+    }
+    a {
+        color: #222222;
+        text-decoration: underline;
+    }
+
+    a[class=custom-link] {
+        font-family: 'Helvetica', sans-serif;
+        font-size: 14px;
+        line-height: 0.8em;
+    }
+
+    p[class="MsoNormal"] {
+        display: inline;
+    }
+
+    img {
+        max-width: 100% !important;
+        height: auto !important;
+    }
+
+    p, h1, h2, h3, h4, h5, h6, ul, ol {
+        margin: 0;
+    }
+
+    ul {
+        padding: 0;
+        margin: 0 0 0 16px;
+    }
+
+    li {
+        list-style-type: disc;
+    }
+
+    table.footer a[href^=tel], table.footer a[href^=sms], table.footer .MsgBody .Object {
+        text-decoration: none;
+        color: #FFFFFF !important;
+        cursor: default;
+    }
+
+    @media only screen and (max-device-width: 640px) {
+        a[class=custom-link] {
+            font-size: 11px !important;
+        }
+    }
+
+    @media only screen and (min-device-width: 641px) {
+        table[class=full] {
+            width: 640px !important;
+        }
+    }
+
+    @media only screen and (max-device-width: 640px) {
+        img[class=img-full] {
+            width: 100% !important;
+        }
+    }
+</style>
+
+<!--[if (gte mso 9)|(IE)]>
+<table width="640" align="center" bgcolor="#FFFFFF" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+        <td>
+<![endif]-->
+<table class="full" align="center" cellpadding="0" cellspacing="0" border="0" bgcolor="#FFFFFF"
+       style="width: 100%; max-width: 640px;">
+    <!--<tr>
+    <td width="640" style="background-color:#63ae2f;; text-align: center; height: 20px; font-size: 1px;">
+         
+    </td>
+</tr>
+<tr>
+    <td width="640" style="background-color:#63ae2f;; text-align: center;">
+        <img src="https://badnet.fr/Template/Img/Logo/BadNet_Long_blanc.png"  alt="Logo BadNet" class="img-full"
+         style="display: block; border: 0; width: 75%;margin: 0 auto; max-width: 640px;">
+    </td>
+</tr>
+<tr>
+    <td width="640" style="background-color:#63ae2f;; text-align: center; height: 10px; font-size: 1px;">
+        
+    </td>
+</tr>-->
+<tr>
+    <td colspan="3" height="20" style="background-color:#63ae2f;; font-size: 0px;"> </td>
+</tr>
+<tr>
+    <td width="20" style="background-color:#63ae2f;; font-size: 0px;"> </td>
+    <td width="600" style="background-color:#63ae2f;; text-align: center;">
+        <img src="https://badnet.fr/Template/Img/Logo/BadNet_Long_blanc.png"  alt="Logo BadNet" class="img-full"
+             style="display: block; border: 0; width: 60%;margin: 0 auto; max-width: 600px;">
+    </td>
+    <td width="20" style="background-color:#63ae2f;; font-size: 0px;"> </td>
+</tr>
+<tr>
+    <td colspan="3" height="10" style="background-color:#63ae2f;; font-size: 0px;"> </td>
+</tr>
+</table>
+<!--[if (gte mso 9)|(IE)]>
+</td>
+</tr>
+</table>
+<![endif]-->
+<!--[if (gte mso 9)|(IE)]>
+<table width="640" align="center" bgcolor="#FFFFFF" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+        <td>
+<![endif]-->
+<table class="full" align="center" cellpadding="0" cellspacing="0" border="0" bgcolor="#FFFFFF"
+       style="width: 100%; max-width: 640px;">
+    <tr>
+        <td width="20" style="background-color:#63ae2f;; font-size: 0px;"> </td>
+        <td align="center">
+            <h1 class="title" style="line-height: 30px; color:#ffffff; background-color:#63ae2f;; font-size:17px; margin-top:0px; padding-bottom:10px; padding-top:10px; margin-bottom:0px;">Code authentification BadNet</h1>
+        </td>
+        <td width="20" style="background-color:#63ae2f;; font-size: 0px;"> </td>
+    </tr>
+    <tr>
+        <td colspan="3" height="10" style="background-color:#63ae2f;; font-size: 0px;"> </td>
+    </tr>
+    <tr>
+        <td colspan="3" height="10" style="font-size: 0px;"> </td>
+    </tr>
+    <tr>
+        <td width="20" style="font-size: 0px;"> </td>
+        <td>
+            <div><div><h2>Bonjour Club Exemple</h2>
+</div>
+<div><p>Votre code d'authentification est : 321265</p>
+</div>
+<div><p>Nous vous avons envoyé ce code de vérification pour protéger votre compte BadNet. Ce code à un usage unique et n’est valable que 10 minutes.</p>
+</div>
+<div><p><strong>Vous n’avez pas essayé de vous connecter ou de réaliser une action nécessitant un code d'authentification ? Nous vous recommandons de <a href='https://badnet.fr/mot-de-passe-oublie' target='_blank'>changer votre mot de passe</a> pour assurer la protection de votre compte ou d'ouvrir un ticket <a href='https://pilote.i-click.fr/badnet-v5'>en cliquant ici</a>.</strong></p>
+</div>
+<div><p>Sportivement,</p>
+</div>
+<div><p>Le support BadNet</p>
+</div>
+</div>
+
+        </td>
+        <td width="20" style="font-size: 0px;"> </td>
+    </tr>
+    <tr>
+        <td colspan="3" height="40" style="font-size: 0px;"> </td>
+    </tr>
+</table>
+<!--[if (gte mso 9)|(IE)]>
+</td>
+</tr>
+</table>
+<![endif]-->
+<!--[if (gte mso 9)|(IE)]>
+<table width="640" align="center" bgcolor="#0C2340" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+        <td>
+<![endif]-->
+<table class="full footer" align="center" cellpadding="0" cellspacing="0" border="0" bgcolor="#63ae2f;"
+       style="width: 100%; max-width: 640px;background-color:#63ae2f;;">
+    <tr>
+        <td colspan="5" height="15" style="font-size: 0px;"> </td>
+    </tr>
+    <tr>
+        <td width="20"> </td>
+        <td align="left" valign="center" width="480">
+            <p style="color:#ffffff;">
+                <b>BadNet</b><br/>
+                <a href="mailto:contact@badnet.fr" style="text-decoration: none; color:#ffffff;">contact@badnet.fr</a>
+            </p>
+        </td>
+        <td width="20" style="font-size: 0px;"> </td>
+        <td width="120" valign="center" align="right">
+            <a href="https://badnet.fr" target="_blank"><img
+                    src="https://badnet.fr/Template/Img/Logo/BadNet_Long_blanc.png"
+                    alt="i-click"></a>
+        </td>
+        <td width="20" style="font-size: 0px;"> </td>
+    </tr>
+    <tr>
+        <td colspan="5" height="15" style="font-size: 0px;"> </td>
+    </tr>
+</table>
+<!--[if (gte mso 9)|(IE)]>
+</td>
+</tr>
+</table>
+<![endif]-->
+</body>
+</html>
+
+--b1=_F6XaAUb9ueWHnTKznxwh58YDErBdlCsT7KNegCbOX4A
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml"
+      xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Code authentification BadNet</title>
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <!--[if gte mso 9]>
+    <xml>
+        <o:OfficeDocumentSettings>
+            <o:AllowPNG/>
+            <o:PixelsPerInch>96</o:PixelsPerInch>
+        </o:OfficeDocumentSettings>
+    </xml><![endif]-->
+</head>
+<body>
+
+
+<style type="text/css">
+
+    table, td, p, a, span, h1, h2 {
+        font-family: 'Lato', 'Helvetica', sans-serif;
+        font-size: 14px;
+        line-height: 1.3em;
+    }
+
+    h1[class=title] {
+        font-family: 'Lato', 'Helvetica', sans-serif;
+        line-height: 1em;
+        font-size: 20px !important;
+        letter-spacing: 2px;
+        color: #222222;
+        font-weight: 700;
+    }
+
+    p[class=custom-paragraphe] {
+        font-family: 'Lato', 'Helvetica', sans-serif;
+        font-size: 14px;
+        line-height: 1.3em;
+        margin: 0 auto;
+    }
+    p {
+        padding: 8px 0;
+    }
+    a {
+        color: #222222;
+        text-decoration: underline;
+    }
+
+    a[class=custom-link] {
+        font-family: 'Helvetica', sans-serif;
+        font-size: 14px;
+        line-height: 0.8em;
+    }
+
+    p[class="MsoNormal"] {
+        display: inline;
+    }
+
+    img {
+        max-width: 100% !important;
+        height: auto !important;
+    }
+
+    p, h1, h2, h3, h4, h5, h6, ul, ol {
+        margin: 0;
+    }
+
+    ul {
+        padding: 0;
+        margin: 0 0 0 16px;
+    }
+
+    li {
+        list-style-type: disc;
+    }
+
+    table.footer a[href^=tel], table.footer a[href^=sms], table.footer .MsgBody .Object {
+        text-decoration: none;
+        color: #FFFFFF !important;
+        cursor: default;
+    }
+
+    @media only screen and (max-device-width: 640px) {
+        a[class=custom-link] {
+            font-size: 11px !important;
+        }
+    }
+
+    @media only screen and (min-device-width: 641px) {
+        table[class=full] {
+            width: 640px !important;
+        }
+    }
+
+    @media only screen and (max-device-width: 640px) {
+        img[class=img-full] {
+            width: 100% !important;
+        }
+    }
+</style>
+
+<!--[if (gte mso 9)|(IE)]>
+<table width="640" align="center" bgcolor="#FFFFFF" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+        <td>
+<![endif]-->
+<table class="full" align="center" cellpadding="0" cellspacing="0" border="0" bgcolor="#FFFFFF"
+       style="width: 100%; max-width: 640px;">
+    <!--<tr>
+    <td width="640" style="background-color:#63ae2f;; text-align: center; height: 20px; font-size: 1px;">
+        &nbsp;
+    </td>
+</tr>
+<tr>
+    <td width="640" style="background-color:#63ae2f;; text-align: center;">
+        <img src="https://badnet.fr/Template/Img/Logo/BadNet_Long_blanc.png"  alt="Logo BadNet" class="img-full"
+         style="display: block; border: 0; width: 75%;margin: 0 auto; max-width: 640px;">
+    </td>
+</tr>
+<tr>
+    <td width="640" style="background-color:#63ae2f;; text-align: center; height: 10px; font-size: 1px;">
+       &nbsp;
+    </td>
+</tr>-->
+<tr>
+    <td colspan="3" height="20" style="background-color:#63ae2f;; font-size: 0px;">&nbsp;</td>
+</tr>
+<tr>
+    <td width="20" style="background-color:#63ae2f;; font-size: 0px;">&nbsp;</td>
+    <td width="600" style="background-color:#63ae2f;; text-align: center;">
+        <img src="https://badnet.fr/Template/Img/Logo/BadNet_Long_blanc.png"  alt="Logo BadNet" class="img-full"
+             style="display: block; border: 0; width: 60%;margin: 0 auto; max-width: 600px;">
+    </td>
+    <td width="20" style="background-color:#63ae2f;; font-size: 0px;">&nbsp;</td>
+</tr>
+<tr>
+    <td colspan="3" height="10" style="background-color:#63ae2f;; font-size: 0px;">&nbsp;</td>
+</tr>
+</table>
+<!--[if (gte mso 9)|(IE)]>
+</td>
+</tr>
+</table>
+<![endif]-->
+<!--[if (gte mso 9)|(IE)]>
+<table width="640" align="center" bgcolor="#FFFFFF" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+        <td>
+<![endif]-->
+<table class="full" align="center" cellpadding="0" cellspacing="0" border="0" bgcolor="#FFFFFF"
+       style="width: 100%; max-width: 640px;">
+    <tr>
+        <td width="20" style="background-color:#63ae2f;; font-size: 0px;">&nbsp;</td>
+        <td align="center">
+            <h1 class="title" style="line-height: 30px; color:#ffffff; background-color:#63ae2f;; font-size:17px; margin-top:0px; padding-bottom:10px; padding-top:10px; margin-bottom:0px;">Code authentification BadNet</h1>
+        </td>
+        <td width="20" style="background-color:#63ae2f;; font-size: 0px;">&nbsp;</td>
+    </tr>
+    <tr>
+        <td colspan="3" height="10" style="background-color:#63ae2f;; font-size: 0px;">&nbsp;</td>
+    </tr>
+    <tr>
+        <td colspan="3" height="10" style="font-size: 0px;">&nbsp;</td>
+    </tr>
+    <tr>
+        <td width="20" style="font-size: 0px;">&nbsp;</td>
+        <td>
+            <div><div><h2>Bonjour Club Exemple</h2>
+</div>
+<div><p>Votre code d'authentification est : 321265</p>
+</div>
+<div><p>Nous vous avons envoyé ce code de vérification pour protéger votre compte BadNet. Ce code à un usage unique et n’est valable que 10 minutes.</p>
+</div>
+<div><p><strong>Vous n’avez pas essayé de vous connecter ou de réaliser une action nécessitant un code d'authentification ? Nous vous recommandons de <a href='https://badnet.fr/mot-de-passe-oublie' target='_blank'>changer votre mot de passe</a> pour assurer la protection de votre compte ou d'ouvrir un ticket <a href='https://pilote.i-click.fr/badnet-v5'>en cliquant ici</a>.</strong></p>
+</div>
+<div><p>Sportivement,</p>
+</div>
+<div><p>Le support BadNet</p>
+</div>
+</div>
+
+        </td>
+        <td width="20" style="font-size: 0px;">&nbsp;</td>
+    </tr>
+    <tr>
+        <td colspan="3" height="40" style="font-size: 0px;">&nbsp;</td>
+    </tr>
+</table>
+<!--[if (gte mso 9)|(IE)]>
+</td>
+</tr>
+</table>
+<![endif]-->
+<!--[if (gte mso 9)|(IE)]>
+<table width="640" align="center" bgcolor="#0C2340" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+        <td>
+<![endif]-->
+<table class="full footer" align="center" cellpadding="0" cellspacing="0" border="0" bgcolor="#63ae2f;"
+       style="width: 100%; max-width: 640px;background-color:#63ae2f;;">
+    <tr>
+        <td colspan="5" height="15" style="font-size: 0px;">&nbsp;</td>
+    </tr>
+    <tr>
+        <td width="20">&nbsp;</td>
+        <td align="left" valign="center" width="480">
+            <p style="color:#ffffff;">
+                <b>BadNet</b><br/>
+                <a href="mailto:contact@badnet.fr" style="text-decoration: none; color:#ffffff;">contact@badnet.fr</a>
+            </p>
+        </td>
+        <td width="20" style="font-size: 0px;">&nbsp;</td>
+        <td width="120" valign="center" align="right">
+            <a href="https://badnet.fr" target="_blank"><img
+                    src="https://badnet.fr/Template/Img/Logo/BadNet_Long_blanc.png"
+                    alt="i-click"></a>
+        </td>
+        <td width="20" style="font-size: 0px;">&nbsp;</td>
+    </tr>
+    <tr>
+        <td colspan="5" height="15" style="font-size: 0px;">&nbsp;</td>
+    </tr>
+</table>
+<!--[if (gte mso 9)|(IE)]>
+</td>
+</tr>
+</table>
+<![endif]-->
+</body>
+</html>
+
+
+--b1=_F6XaAUb9ueWHnTKznxwh58YDErBdlCsT7KNegCbOX4A--
+

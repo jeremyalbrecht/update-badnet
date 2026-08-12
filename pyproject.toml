@@ -1,0 +1,34 @@
+[project]
+name = "function"
+description = "Sync the Badnet per-licensee tournament export into a Google Sheet for Augny Badminton Club."
+version = "1.0.0"
+requires-python = ">=3.10"
+readme = "README.md"
+license = "MIT"
+dependencies = [
+  "httpx",
+  "beautifulsoup4",
+  "openpyxl",
+  "google-api-python-client",
+  "google-auth",
+]
+authors = [
+  { name="Jérémy Albrecht"},
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pytest-asyncio",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["function"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"

@@ -1,0 +1,30 @@
+
+# Functions use the .func directory for local runtime data which should
+# generally not be tracked in source control. To instruct the system to track
+# .func in source control, comment the following line (prefix it with '# ').
+/.func
+/.venv
+.claude
+
+# Secrets & credentials — never commit these
+.env
+key.json
+*.json.key
+service-account*.json
+# GCP service-account keys download as <project>-<keyid>.json
+augny-badminton-*.json
+*-service-account.json
+
+# Captured browser sessions contain live session cookies
+*.har
+# Raw mail dumps at the repo root (the sanitized fixture is tracked)
+/*.eml
+
+# Editor
+.idea/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
