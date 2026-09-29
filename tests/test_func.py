@@ -531,6 +531,20 @@ def test_read_export_stringifies_cells_and_blanks_nones():
     assert rows == [["Nom", "Licence"], ["Dupont", "7123456"], ["X", ""]]
 
 
+def test_read_export_drops_blank_rows():
+    # openpyxl reports the workbook's trailing and interleaved blank rows; they
+    # would otherwise land in the sheet as empty lines.
+    rows = func.read_export(make_xlsx([
+        ["Nom", "Licence"],
+        ["Dupont", "1"],
+        [None, None],
+        ["Martin", "2"],
+        ["", ""],
+        [None, None],
+    ]))
+    assert rows == [["Nom", "Licence"], ["Dupont", "1"], ["Martin", "2"]]
+
+
 def test_read_export_keeps_a_single_column_export_intact():
     # The banner heuristic must not eat a legitimately narrow export.
     rows = func.read_export(make_xlsx([["Licence"], ["07000001"]]))

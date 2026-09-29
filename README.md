@@ -155,7 +155,7 @@ every label found on the page — paste the correct one into `EXPORT_LABEL`.
 ## Deployment
 
 ```bash
-func deploy --registry docker.io/jeremyalbrecht
+kn func deploy --image docker.io/jeremyalbrecht/update-badnet:latest --push=false --remote=false --build=false
 ```
 
 CI builds and pushes the image on every push to `main` that touches

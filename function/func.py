@@ -226,9 +226,10 @@ def read_export(content):
     genuine XLSX as ``application/xls``, which would otherwise be rejected as a
     legacy workbook.
 
-    Badnet pads every row out to 100 columns and puts a merged title banner
-    above the real header. Both are spreadsheet decoration, so stripping them
-    is not a schema mapping — the surviving columns are whatever Badnet sent.
+    Badnet pads every row out to 100 columns, puts a merged title banner above
+    the real header and leaves blank spacer rows in the sheet. All three are
+    spreadsheet decoration, so stripping them is not a schema mapping — the
+    surviving rows and columns are whatever Badnet sent.
     """
     if not content or not content.strip():
         raise ValueError("Badnet returned an empty export; refusing to clear the sheet")
@@ -259,6 +260,12 @@ def read_export(content):
         if first:
             logging.info("Dropped %d preamble row(s) above the header", first)
         rows = rows[first:]
+        populated = populated[first:]
+
+    blank = sum(1 for count in populated if not count)
+    if blank:
+        logging.info("Dropped %d blank row(s)", blank)
+        rows = [row for row, count in zip(rows, populated) if count]
 
     logging.info("Decoded export: %d rows x %d columns", len(rows), len(rows[0]))
     return rows
