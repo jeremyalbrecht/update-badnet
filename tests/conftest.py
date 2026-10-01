@@ -218,7 +218,20 @@ def make_sheets_service(existing_rows=None, sheet_title="Tournois", column_count
 
     def _batch_update(**kwargs):
         for request in kwargs.get("body", {}).get("requests", []):
-            calls.append((f"batchUpdate.{next(iter(request))}", request))
+            kind = next(iter(request))
+            calls.append((f"batchUpdate.{kind}", request))
+            if kind == "addSheet":
+                # Reflect the new tab so the re-fetch in _update_sheet finds it,
+                # exactly as the real API would.
+                props = request["addSheet"]["properties"]
+                meta["sheets"].append({
+                    "properties": {
+                        "title": props["title"],
+                        "sheetId": 9999,
+                        "gridProperties": {"rowCount": 1000, "columnCount": 26},
+                    },
+                    "tables": [],
+                })
         return MagicMock(execute=MagicMock(return_value={}))
 
     spreadsheets.get.side_effect = _get
@@ -239,6 +252,25 @@ def make_xlsx(rows):
     sheet = workbook.active
     for row in rows:
         sheet.append(row)
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
+
+
+def make_multi_sheet_xlsx(sheets):
+    """An in-memory workbook with several named tabs, in insertion order.
+
+    ``sheets`` maps a tab title to its rows. Used to exercise the wallet export,
+    which is a multi-sheet workbook the reader must pick a named tab out of.
+    """
+    from openpyxl import Workbook
+
+    workbook = Workbook()
+    workbook.remove(workbook.active)
+    for title, rows in sheets.items():
+        sheet = workbook.create_sheet(title=title)
+        for row in rows:
+            sheet.append(row)
     buffer = io.BytesIO()
     workbook.save(buffer)
     return buffer.getvalue()

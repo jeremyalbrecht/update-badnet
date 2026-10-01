@@ -1,9 +1,17 @@
 # update-badnet
 
 Knative Python HTTP function that logs into [Badnet](https://badnet.fr) as a club
-administrator, downloads the **"Excel du détail des tournois des licenciés"**
-export, and replaces a Google Sheet tab with it for
-[Augny Badminton](https://augny-badminton.fr).
+administrator and, in a **single authenticated session**, syncs two Google Sheet
+tabs for [Augny Badminton](https://augny-badminton.fr):
+
+- the **"Excel du détail des tournois des licenciés"** tournament export, and
+- the club **wallet ledger** behind the "Excel financier du club" button,
+  reshaped for the club's cashier app (see
+  [The wallet ledger](#the-wallet-ledger-portefeuille-badnet)).
+
+Both downloads share one `_login`, so the run still costs a single 2FA email.
+The two syncs are **independent**: if one export fails, the other still updates
+and the response reports the partial failure with HTTP `207`.
 
 ## How it works
 
@@ -40,12 +48,44 @@ An HTTP request to the function triggers one full pass:
    are exactly what Badnet sent. The live export is 14 columns:
    `Nom prénom, Licence, Catégorie, Tournoi, Lieu, Date, Matchs, Vainqueur,
    Finaliste, Troisième, Montant dû, Paiement joueur, Paiement club, Rbs joueur`.
-6. **Sync** — full replacement of the target tab: read the old rows for the diff,
-   drop any tables, grow the grid if the export is wider, clear, write every
-   column verbatim, re-add the table. Responds with a JSON row-count summary.
+6. **Sync** — full replacement of each target tab: read the old rows for the diff,
+   drop any tables, grow the grid if the data is wider, clear, write every
+   column verbatim, re-add the table. Responds with a JSON row-count summary per
+   sheet (`{"tournoi": {…}, "portefeuille": {…}}`).
 
 Tokens are **never hardcoded** — `ic_a` is per-action and per-session, and the
 export's `assoid`/`season` parameters come from the button's own `data-ic_url`.
+
+## The wallet ledger (`Portefeuille Badnet`)
+
+The "Excel financier du club" button is reached by a four-hop iclick chain —
+**Portefeuille → Mon portefeuille BadNet → Consulter l'historique du portefeuille
+→ Excel financier du club** — and downloads a multi-sheet workbook. Only its
+**`Manipulations du portefeuille`** sheet is read; its columns are
+`Date | Auteur | Manipulation | Montant | Frais | Total`.
+
+That ledger is reshaped — **one row per movement, never aggregated** — into the
+schema the cashier app expects, filtered to the current season (from the most
+recent **1 September**), and written to the `Portefeuille Badnet` tab (created
+automatically if missing):
+
+| Column | Source | Notes |
+|---|---|---|
+| `Date` | `Date` (`DD-MM-YYYY`) | ISO `YYYY-MM-DD` |
+| `Type` | derived from `Manipulation` | closed vocabulary, below |
+| `Libellé` | `Manipulation` | verbatim |
+| `Montant` | `Montant` | number, signed |
+| `Frais` | `Frais` | number |
+| `Total` | `Total` | number, signed |
+| `Tournoi` | parsed out of `Manipulation` | empty when none |
+
+`Type` is one of six values, derived from the French prose because Badnet does
+not tag the rows: `engagement` (payments for players), `engagement-rembourse`
+(online-payment refund), `inscription-tournoi` (tournament payout into the
+wallet), `virement` (bank transfer), `frais` (service fees charged) and
+`frais-rembourse` (service-fee refund). A `Manipulation` wording that matches
+**none** of these **fails the run loudly** rather than being silently
+mis-booked — that is the intended signal that Badnet changed a label.
 
 ## Environment variables
 
@@ -58,7 +98,8 @@ Read in `start(cfg)`; configured via `func.yaml` `run.envs`.
 | `GMAIL_ADDRESS` | yes | Mailbox that receives the 2FA code |
 | `GMAIL_APP_PASSWORD` | yes | Gmail **app password** for that mailbox (see below) |
 | `GOOGLE_SHEETS_ID` | yes | Target spreadsheet ID |
-| `GOOGLE_SHEET_NAME` | yes | Target sheet tab name |
+| `GOOGLE_SHEET_NAME` | yes | Target tab for the tournament export |
+| `PORTEFEUILLE_SHEET_NAME` | no | Tab for the wallet ledger (default `Portefeuille Badnet`; auto-created) |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | yes | Full service-account JSON payload |
 | `BADNET_2FA_TIMEOUT` | no | Seconds to wait for the code (default `120`) |
 | `LOG_LEVEL` | no | `DEBUG` traces every request/response (default `INFO`) |

@@ -17,6 +17,7 @@ from conftest import (
     fixture_bytes,
     fixture_text,
     make_email,
+    make_multi_sheet_xlsx,
     make_sheets_service,
     make_xlsx,
 )
@@ -50,6 +51,7 @@ def make_updater(**kwargs):
     updater.gmail_app_password = "app-pw"
     updater.sheet_id = "sheet-abc"
     updater.sheet_name = "Tournois"
+    updater.portefeuille_sheet_name = "Portefeuille Badnet"
     updater.timeout = 120
     return updater
 
@@ -102,36 +104,37 @@ def test_start_rejects_missing_required_config():
 
 
 @pytest.mark.asyncio
-async def test_handle_returns_the_diff_as_json():
+async def test_handle_returns_a_diff_per_sheet_as_json():
     updater = make_updater()
     diff = {"total": 2, "added": 1, "removed": 0, "columns": 14}
 
     async def fetch():
-        return make_xlsx([["Nom"], ["Dupont"]])
+        return {"tournoi": make_xlsx([["Nom"], ["Dupont"]]),
+                "portefeuille": wallet_workbook([ENGAGEMENT])}
 
-    updater._fetch_export = fetch
-    updater._update_sheet = lambda rows: diff
+    updater._fetch_all = fetch
+    updater._update_sheet = lambda rows, sheet_name, **kw: diff
 
     sent = await drive_handle(updater)
 
     assert sent[0]["status"] == 200
     assert [b"content-type", b"application/json"] in sent[0]["headers"]
-    assert json.loads(sent[1]["body"]) == diff
+    assert json.loads(sent[1]["body"]) == {"tournoi": diff, "portefeuille": diff}
 
 
 @pytest.mark.asyncio
-async def test_handle_reports_failures_as_500_with_the_message():
+async def test_handle_reports_a_login_failure_as_500_with_the_message():
     updater = make_updater()
 
     async def boom():
-        raise ValueError("export button not found")
+        raise ValueError("Badnet authentication failed")
 
-    updater._fetch_export = boom
+    updater._fetch_all = boom
 
     sent = await drive_handle(updater)
 
     assert sent[0]["status"] == 500
-    assert b"export button not found" in sent[1]["body"]
+    assert b"Badnet authentication failed" in sent[1]["body"]
 
 
 # --------------------------------------------------------------------------
@@ -201,6 +204,14 @@ def test_find_action_picks_the_right_export_button_by_label():
     assert func.find_action(STATISTIQUES, EXPORT_LABEL) == (
         "dd9a33fae336d129eb0d2b36a3dcc116",
         {"season": "20", "assoid": "564", "popup": "1"})
+
+
+def test_find_action_tolerates_a_list_shaped_data_ic_url():
+    # Wallet tabs carry data-ic_url='[]' (a JSON list, not an object) plus their
+    # params as flat data-* attributes. The list must contribute nothing, not crash.
+    html = ('<a data-ic_a="abc" data-ic_url="[]" data-toggle="tab" '
+            'data-user_id="U">Mon portefeuille BadNet</a>')
+    assert func.find_action(html, "Mon portefeuille BadNet") == ("abc", {"user_id": "U"})
 
 
 def test_find_action_ignores_accents_and_case():
@@ -511,9 +522,9 @@ def real_shaped_export():
     return make_xlsx([
         _pad(["Compétitions des licenciés de Club Exemple — saison 2025-2026"]),
         _pad(REAL_HEADER),
-        _pad(["DUPONT Marie", "07000001", "+35-V1", "La Biche", "Augny",
+        _pad(["DUPONT Marie", "07000001", "+35-V1", "Tournoi Exemple", "Ville Exemple",
               "Le 26 décembre 2025", "4", "1", "0", "0", "10", "0", "10", "0"]),
-        _pad(["MARTIN Lucas", "07000002", "Sénior", "Les plumes", "Metz",
+        _pad(["MARTIN Lucas", "07000002", "Sénior", "Tournoi Beta", "Ville Beta",
               "Les 4 et 5 juillet", "9", "1", "1", "0", "14", "0", "14", "0"]),
     ])
 
@@ -563,6 +574,133 @@ def test_read_export_rejects_what_it_cannot_trust(payload, message):
         func.read_export(payload)
 
 
+# --------------------------------------------------------------------------
+# Reading the wallet (portefeuille) ledger
+#
+# Live shape: the "Excel financier du club" button downloads a multi-sheet
+# workbook; only "Manipulations du portefeuille" is read. Its columns are
+# Date | Auteur | Manipulation | Montant | Frais | Total, with a club-name
+# banner above the header. Type and Tournoi are derived from the prose.
+# --------------------------------------------------------------------------
+
+SEASON_START = func.season_start(NOW)  # NOW is 2026-08-12 -> 2025-09-01
+
+# One row of each kind, modelled on the real export wordings with fake names.
+ENGAGEMENT = ("29-09-2026", "Club Exemple",
+              "Paiements pour les joueurs DUPONT Marie, MARTIN Lucas "
+              "pour le tournoi Tournoi Exemple #3", -22.0, 0.86, -22.86)
+FRAIS_RBS = ("29-09-2026", "Club Exemple",
+             "Tournoi Exemple #3 : remboursement des frais de service "
+             "grâce à l'utilisation du portefeuille", 0.86, 0.0, 0.86)
+ENG_RBS = ("15-09-2026", "Club Exemple", "Remboursement paiement en ligne - DUPONT Marie",
+           11.0, 0.0, 11.0)
+INSCRIPTION = ("20-09-2026", "Club Exemple",
+               "Tournoi Exemple #15 : versement sur le portefeuille du club",
+               340.0, 0.0, 340.0)
+VIREMENT = ("10-09-2026", "Club Exemple", "Virement bancaire", -500.0, 0.0, -500.0)
+
+
+def wallet_workbook(data_rows, with_other_sheets=True):
+    manip = ([["Club Exemple"],
+              ["Date", "Auteur", "Manipulation", "Montant", "Frais", "Total"]]
+             + [list(r) for r in data_rows] + [[]])
+    sheets = {func.MANIP_SHEET: manip}
+    if with_other_sheets:
+        # Prove the reader picks the named tab, not the first/active one.
+        sheets = {"Paiement par des joueurs": [["x"]], func.MANIP_SHEET: manip}
+    return make_multi_sheet_xlsx(sheets)
+
+
+@pytest.mark.parametrize("manipulation, expected", [
+    ("Virement bancaire", "virement"),
+    ("Remboursement paiement en ligne - DUPONT Marie", "engagement-rembourse"),
+    ("Paiements pour les joueurs X, Y pour le tournoi Z", "engagement"),
+    ("Z : remboursement des frais de service grâce à l'utilisation du portefeuille",
+     "frais-rembourse"),
+    ("Tournoi Exemple #15 : versement sur le portefeuille du club",
+     "inscription-tournoi"),
+])
+def test_classify_manipulation_maps_the_real_wordings(manipulation, expected):
+    assert func.classify_manipulation(manipulation) == expected
+
+
+def test_classify_manipulation_raises_on_an_unknown_wording():
+    # A new Badnet label must surface loudly, never be silently mis-booked.
+    with pytest.raises(ValueError, match="Unrecognised"):
+        func.classify_manipulation("Quelque chose de totalement nouveau")
+
+
+@pytest.mark.parametrize("text, kind, expected", [
+    ("Paiements pour les joueurs X, Y pour le tournoi Tournoi Exemple #3", "engagement",
+     "Tournoi Exemple #3"),
+    ("Tournoi Exemple #3 : remboursement des frais de service grâce à l'utilisation du portefeuille",
+     "frais-rembourse", "Tournoi Exemple #3"),
+    ("Tournoi Exemple #15 : versement sur le portefeuille du club",
+     "inscription-tournoi", "Tournoi Exemple #15"),
+    ("Virement bancaire", "virement", ""),
+    ("Remboursement paiement en ligne - DUPONT Marie", "engagement-rembourse", ""),
+])
+def test_extract_tournoi_mines_only_the_keyed_shapes(text, kind, expected):
+    assert func.extract_tournoi(text, kind) == expected
+
+
+def test_portefeuille_rows_reshapes_into_the_cashier_schema():
+    rows = func.portefeuille_rows(wallet_workbook([ENGAGEMENT]), SEASON_START)
+    assert rows[0] == ["Date", "Type", "Libellé", "Montant", "Frais", "Total", "Tournoi"]
+    assert rows[1] == [
+        "2026-09-29", "engagement", ENGAGEMENT[2], -22.0, 0.86, -22.86,
+        "Tournoi Exemple #3"]
+
+
+def test_portefeuille_rows_keeps_amounts_as_native_numbers():
+    rows = func.portefeuille_rows(wallet_workbook([VIREMENT]), SEASON_START)
+    assert rows[1][3:6] == [-500.0, 0.0, -500.0]
+    assert all(isinstance(v, (int, float)) for v in rows[1][3:6])
+
+
+def test_portefeuille_rows_filters_to_the_current_season():
+    old = ("15-08-2025", "Club", "Virement bancaire", -1.0, 0.0, -1.0)  # before 1 Sep 2025
+    rows = func.portefeuille_rows(wallet_workbook([old, VIREMENT]), SEASON_START)
+    dates = [r[0] for r in rows[1:]]
+    assert dates == ["2026-09-10"]  # the August 2025 movement is dropped
+
+
+def test_portefeuille_rows_drops_the_footer_and_blank_rows():
+    data = [ENGAGEMENT, ["Total", 100.0, 5.0], []]
+    rows = func.portefeuille_rows(wallet_workbook(data), SEASON_START)
+    assert len(rows) == 2  # header + the single real movement
+
+
+def test_portefeuille_rows_picks_the_named_sheet_not_the_first():
+    # with_other_sheets puts another tab first; the reader must still find ours.
+    rows = func.portefeuille_rows(wallet_workbook([INSCRIPTION]), SEASON_START)
+    assert rows[1][1] == "inscription-tournoi"
+
+
+def test_portefeuille_rows_raises_when_the_sheet_is_absent():
+    only_other = make_multi_sheet_xlsx({"Autre chose": [["Date"]]})
+    with pytest.raises(ValueError, match="Manipulations du portefeuille"):
+        func.portefeuille_rows(only_other, SEASON_START)
+
+
+def test_portefeuille_rows_raises_on_an_empty_ledger():
+    # No movements at all signals a broken export; refuse rather than wipe.
+    with pytest.raises(ValueError, match="no data rows"):
+        func.portefeuille_rows(wallet_workbook([]), SEASON_START)
+
+
+def test_portefeuille_rows_allows_an_empty_in_season_result():
+    # A season with movements only before 1 Sep is legitimate: header only, no raise.
+    old = ("15-08-2025", "Club", "Virement bancaire", -1.0, 0.0, -1.0)
+    rows = func.portefeuille_rows(wallet_workbook([old]), SEASON_START)
+    assert rows == [func.PORTEFEUILLE_HEADER]
+
+
+def test_portefeuille_rows_rejects_a_non_xlsx_payload():
+    with pytest.raises(ValueError, match="not an XLSX"):
+        func.portefeuille_rows(b"Date;Manipulation\r\n", SEASON_START)
+
+
 def test_diff_rows_counts_added_and_removed():
     old = [["Nom", "Licence"], ["Dupont", "1"], ["Ancien", "2"]]
     new = [["Nom", "Licence"], ["Dupont", "1"], ["Nouveau", "3"]]
@@ -583,10 +721,10 @@ def test_diff_rows_treats_an_empty_sheet_as_all_added():
 ROWS = [["Nom", "Licence"], ["Dupont", "1"], ["Martin", "2"]]
 
 
-def sync(service, rows=ROWS, **kwargs):
+def sync(service, rows=ROWS, sheet_name="Tournois", **kwargs):
     updater = make_updater()
     updater.sheet = service
-    return updater._update_sheet(rows)
+    return updater._update_sheet(rows, sheet_name, **kwargs)
 
 
 def call_names(service):
@@ -654,74 +792,158 @@ def test_update_sheet_names_the_available_tabs_when_the_target_is_missing():
         sync(make_sheets_service(sheet_title="Autre"))
 
 
+def test_update_sheet_creates_the_tab_when_asked_and_missing():
+    # The wallet tab need not be set up by hand on the first run.
+    service = make_sheets_service(sheet_title="Autre")
+    sync(service, sheet_name="Portefeuille Badnet", create_missing=True)
+
+    names = call_names(service)
+    assert "batchUpdate.addSheet" in names
+    # The tab is created, then written to.
+    assert names.index("batchUpdate.addSheet") < names.index("values.update")
+    update = next(kw for name, kw in service.recorded_calls if name == "values.update")
+    assert update["range"] == "Portefeuille Badnet!A1"
+
+
 # --------------------------------------------------------------------------
 # End to end
 # --------------------------------------------------------------------------
 
 
-def pipeline(download, service, imap=None):
+# The three wallet navigation hops after the shell, each a minimal page whose
+# only job is to carry the next hop's label. The shell (DASHBOARD) already holds
+# the "Portefeuille" nav link.
+HTML = {"content-type": "text/html"}
+PORTE_PAGE = ('<html><body><a data-ic_a="p1" data-ic_ajax="1" '
+              'data-user_id="U">Mon portefeuille BadNet</a></body></html>')
+PORTE_TAB = ('<html><body><a data-ic_a="p2" data-ic_ajax="1" '
+             "data-user_id=\"U\">Consulter l'historique du portefeuille</a></body></html>")
+PORTE_HIST = ('<html><body><a data-ic_a="p3" data-ic_ajax="1" data-popup="1" '
+              'data-user_id="U">Excel financier du club</a></body></html>')
+
+
+def wallet_download(data_rows=(ENGAGEMENT, VIREMENT)):
+    return FakeResponse(content=wallet_workbook(list(data_rows)),
+                        headers={"content-type": "application/xls"})
+
+
+def pipeline(tournoi_download, service, imap=None, porte_download=None):
     imap = imap or FakeIMAP(messages=[(NOW + timedelta(seconds=5), make_email(CODE_BODY))])
+    if porte_download is None:
+        porte_download = wallet_download()
     client = FakeClient(
-        get_responses=[FakeResponse(CONNEXION), FakeResponse(VALIDATION),
-                       FakeResponse(DASHBOARD), FakeResponse(DASHBOARD),
-                       FakeResponse(STATISTIQUES, headers={"content-type": "text/html"}),
-                       download],
+        get_responses=[
+            FakeResponse(CONNEXION), FakeResponse(VALIDATION),
+            FakeResponse(DASHBOARD), FakeResponse(DASHBOARD),
+            # tournoi chain
+            FakeResponse(STATISTIQUES, headers=HTML), tournoi_download,
+            # portefeuille chain
+            FakeResponse(PORTE_PAGE, headers=HTML), FakeResponse(PORTE_TAB, headers=HTML),
+            FakeResponse(PORTE_HIST, headers=HTML), porte_download,
+        ],
         post_responses=[FakeResponse(REDIRECT_2FA), FakeResponse(REDIRECT_SHELL)])
     updater = make_updater(client_factory=lambda: client, imap_factory=lambda: imap)
     updater.sheet = service
     return updater, client
 
 
+def written_ranges(service):
+    return [kw["range"] for name, kw in service.recorded_calls if name == "values.update"]
+
+
 @pytest.mark.asyncio
-async def test_full_pipeline_logs_in_clears_2fa_and_writes_the_sheet():
-    download = FakeResponse(content=real_shaped_export(),
-                            headers={"content-type": "application/xls"})
+async def test_full_pipeline_logs_in_once_and_writes_both_sheets():
+    tournoi = FakeResponse(content=real_shaped_export(),
+                           headers={"content-type": "application/xls"})
     service = make_sheets_service()
-    updater, client = pipeline(download, service)
+    updater, client = pipeline(tournoi, service)
 
     sent = await drive_handle(updater)
 
     assert sent[0]["status"] == 200
-    assert json.loads(sent[1]["body"]) == {
-        "total": 2, "added": 2, "removed": 0, "columns": 14}
+    body = json.loads(sent[1]["body"])
+    assert body["tournoi"] == {"total": 2, "added": 2, "removed": 0, "columns": 14}
+    assert body["portefeuille"] == {"total": 2, "added": 2, "removed": 0, "columns": 7}
 
-    written = next(kw for name, kw in service.recorded_calls
-                   if name == "values.update")["body"]["values"]
-    assert written[0] == REAL_HEADER
-    # The export request must carry the button's own season and club id.
-    assert client.get_calls[-1]["params"] == {
+    # One login (one 2FA mail), both tabs written.
+    assert client.post_calls[0]["data"]["login"] == "club@example.com"
+    assert "Tournois!A1" in written_ranges(service)
+    assert "Portefeuille Badnet!A1" in written_ranges(service)
+
+    # The tournoi export request carries the button's own season and club id.
+    assert client.get_calls[5]["params"] == {
         "season": "20", "assoid": "564", "popup": "1",
         "ic_ajax": "1", "ic_a": "dd9a33fae336d129eb0d2b36a3dcc116"}
+    # The wallet export request carries the button's user id.
+    assert client.get_calls[9]["params"] == {
+        "user_id": "U", "popup": "1", "ic_ajax": "1", "ic_a": "p3"}
 
 
 @pytest.mark.asyncio
-async def test_an_empty_export_returns_500_and_leaves_the_sheet_untouched():
-    download = FakeResponse(content=b"", headers={"content-type": "application/xls"})
+async def test_wallet_rows_land_in_the_portefeuille_tab():
     service = make_sheets_service()
-    updater, _ = pipeline(download, service)
+    tournoi = FakeResponse(content=real_shaped_export(),
+                           headers={"content-type": "application/xls"})
+    updater, _ = pipeline(tournoi, service,
+                          porte_download=wallet_download([ENGAGEMENT, INSCRIPTION]))
+
+    await drive_handle(updater)
+
+    update = next(kw for name, kw in service.recorded_calls
+                  if name == "values.update" and kw["range"] == "Portefeuille Badnet!A1")
+    rows = update["body"]["values"]
+    assert rows[0] == func.PORTEFEUILLE_HEADER
+    assert [r[1] for r in rows[1:]] == ["engagement", "inscription-tournoi"]
+
+
+@pytest.mark.asyncio
+async def test_a_broken_wallet_export_still_syncs_the_tournoi_sheet():
+    tournoi = FakeResponse(content=real_shaped_export(),
+                           headers={"content-type": "application/xls"})
+    service = make_sheets_service()
+    # An empty wallet download: its sync fails, the tournoi sync must not.
+    broken = FakeResponse(content=b"", headers={"content-type": "application/xls"})
+    updater, _ = pipeline(tournoi, service, porte_download=broken)
 
     sent = await drive_handle(updater)
 
-    assert sent[0]["status"] == 500
-    assert b"empty export" in sent[1]["body"]
-    assert service.recorded_calls == []
+    assert sent[0]["status"] == 207
+    body = json.loads(sent[1]["body"])
+    assert body["tournoi"]["total"] == 2
+    assert "empty export" in body["portefeuille"]["error"]
+    assert "Tournois!A1" in written_ranges(service)
+    assert "Portefeuille Badnet!A1" not in written_ranges(service)
 
 
 @pytest.mark.asyncio
-async def test_a_missing_export_button_returns_500_naming_the_label():
+async def test_a_broken_tournoi_export_still_syncs_the_wallet_sheet():
+    service = make_sheets_service()
+    empty_tournoi = FakeResponse(content=b"", headers={"content-type": "application/xls"})
+    updater, _ = pipeline(empty_tournoi, service)
+
+    sent = await drive_handle(updater)
+
+    assert sent[0]["status"] == 207
+    body = json.loads(sent[1]["body"])
+    assert "empty export" in body["tournoi"]["error"]
+    assert body["portefeuille"]["total"] == 2
+    assert "Tournois!A1" not in written_ranges(service)
+    assert "Portefeuille Badnet!A1" in written_ranges(service)
+
+
+@pytest.mark.asyncio
+async def test_a_login_failure_returns_500_and_writes_nothing():
     service = make_sheets_service()
     client = FakeClient(
-        get_responses=[FakeResponse(CONNEXION), FakeResponse(DASHBOARD),
-                       FakeResponse("<html><body></body></html>",
-                                    headers={"content-type": "text/html"})],
-        post_responses=[FakeResponse(DASHBOARD)])
+        get_responses=[FakeResponse(CONNEXION), FakeResponse(CONNEXION)],
+        post_responses=[FakeResponse(CONNEXION)])
     updater = make_updater(client_factory=lambda: client)
     updater.sheet = service
 
     sent = await drive_handle(updater)
 
     assert sent[0]["status"] == 500
-    assert EXPORT_LABEL.encode() in sent[1]["body"]
+    assert b"authentication failed" in sent[1]["body"]
     assert service.recorded_calls == []
 
 

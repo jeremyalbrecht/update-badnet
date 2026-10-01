@@ -26,7 +26,7 @@ import json
 import logging
 import re
 import unicodedata
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from html import unescape
 from urllib.parse import parse_qsl, urljoin, urlparse
@@ -43,6 +43,21 @@ SHELL_URL = f"{BASE_URL}/tableau-de-bord"
 
 STATISTIQUES_LABEL = "Statistiques"
 EXPORT_LABEL = "Excel du détail des tournois des licenciés"
+
+# The two ic-click navigation chains, each resolved hop by hop on the visible
+# French label. The last label in a chain is the download itself.
+TOURNOI_LABELS = [STATISTIQUES_LABEL, EXPORT_LABEL]
+PORTEFEUILLE_LABELS = [
+    "Portefeuille",
+    "Mon portefeuille BadNet",
+    "Consulter l'historique du portefeuille",
+    "Excel financier du club",
+]
+
+# The wallet download is a multi-sheet workbook; this is the only sheet we read.
+MANIP_SHEET = "Manipulations du portefeuille"
+PORTEFEUILLE_SHEET_DEFAULT = "Portefeuille Badnet"
+PORTEFEUILLE_HEADER = ["Date", "Type", "Libellé", "Montant", "Frais", "Total", "Tournoi"]
 
 HEADERS = {
     "User-Agent": (
@@ -154,14 +169,22 @@ def action_params(element):
     Nav links carry a ``data-ic_url`` JSON blob holding a query string; buttons
     carry flat ``data-season`` / ``data-assoid`` / ``data-popup`` attributes.
     Reading only the JSON form silently drops the season and club id.
+
+    The blob is not always an object: wallet tabs carry ``data-ic_url='[]'``,
+    an empty JSON list, which has no ``url`` to read — so a non-dict blob simply
+    contributes no parameters rather than raising.
     """
     params = {}
     raw = element.get("data-ic_url")
     if raw:
         try:
-            params.update(parse_qsl(urlparse(json.loads(raw).get("url") or "").query))
-        except (json.JSONDecodeError, TypeError):
+            blob = json.loads(raw)
+        except json.JSONDecodeError:
             logging.warning("Unparseable data-ic_url: %r", raw)
+        else:
+            url = blob.get("url") if isinstance(blob, dict) else None
+            if url:
+                params.update(parse_qsl(urlparse(url).query))
 
     params.update({
         name[5:]: value
@@ -219,17 +242,12 @@ def message_date(message):
     return sent.replace(tzinfo=timezone.utc) if sent.tzinfo is None else sent
 
 
-def read_export(content):
-    """Decode the export workbook into rows.
+def assert_xlsx(content):
+    """Reject anything that is not a genuine XLSX workbook.
 
     Format is decided by magic bytes, never by content-type: Badnet serves
     genuine XLSX as ``application/xls``, which would otherwise be rejected as a
     legacy workbook.
-
-    Badnet pads every row out to 100 columns, puts a merged title banner above
-    the real header and leaves blank spacer rows in the sheet. All three are
-    spreadsheet decoration, so stripping them is not a schema mapping — the
-    surviving rows and columns are whatever Badnet sent.
     """
     if not content or not content.strip():
         raise ValueError("Badnet returned an empty export; refusing to clear the sheet")
@@ -237,6 +255,17 @@ def read_export(content):
         raise ValueError("Badnet returned a legacy .xls workbook, which is not supported")
     if not content.startswith(XLSX_MAGIC):
         raise ValueError(f"Export is not an XLSX workbook (starts {content[:8]!r})")
+
+
+def read_export(content):
+    """Decode the export workbook into rows.
+
+    Badnet pads every row out to 100 columns, puts a merged title banner above
+    the real header and leaves blank spacer rows in the sheet. All three are
+    spreadsheet decoration, so stripping them is not a schema mapping — the
+    surviving rows and columns are whatever Badnet sent.
+    """
+    assert_xlsx(content)
 
     from openpyxl import load_workbook
 
@@ -269,6 +298,128 @@ def read_export(content):
 
     logging.info("Decoded export: %d rows x %d columns", len(rows), len(rows[0]))
     return rows
+
+
+def classify_manipulation(text):
+    """Map a wallet ``Manipulation`` label to the cashier app's closed vocabulary.
+
+    Badnet never tags these rows — the type is only legible in the French prose,
+    so it is derived here. An unrecognised label raises rather than guessing: a
+    new Badnet wording must surface loudly instead of being silently mis-booked.
+    """
+    n = normalize(text)
+    if n == "virement bancaire":
+        return "virement"
+    if "remboursement paiement en ligne" in n:
+        return "engagement-rembourse"
+    if "paiement" in n and "pour les joueurs" in n:
+        return "engagement"
+    if "remboursement des frais de service" in n:
+        return "frais-rembourse"
+    if "versement sur le portefeuille" in n:
+        return "inscription-tournoi"
+    # The club has never produced a standalone fee line — service fees live in
+    # the Frais column of engagement rows — so this wording is a best guess.
+    if "frais de service" in n and "prelev" in n:
+        return "frais"
+    raise ValueError(f"Unrecognised wallet manipulation: {text!r}")
+
+
+_TOURNOI_RES = {
+    "engagement": re.compile(r"pour le tournoi\s+(.+)$", re.I),
+    "frais-rembourse": re.compile(r"^(.+?)\s*:\s*remboursement des frais de service", re.I),
+    "inscription-tournoi": re.compile(r"^(.+?)\s*:\s*versement sur le portefeuille", re.I),
+}
+
+
+def extract_tournoi(text, kind):
+    """The tournament name carried in a ``Manipulation`` label, or ``""``.
+
+    Reads the raw label, not the normalised key, so the name keeps its accents
+    and casing. Only the three row kinds that embed a name are mined.
+    """
+    pattern = _TOURNOI_RES.get(kind)
+    match = pattern.search(text or "") if pattern else None
+    return match.group(1).strip() if match else ""
+
+
+def season_start(now):
+    """First day (1 Sept) of the badminton season containing ``now``."""
+    year = now.year if now.month >= 9 else now.year - 1
+    return date(year, 9, 1)
+
+
+def _parse_fr_date(value):
+    """A ``DD-MM-YYYY`` string (or a real date/datetime cell) as a ``date``."""
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    return datetime.strptime(str(value).strip(), "%d-%m-%Y").date()
+
+
+def portefeuille_rows(content, since):
+    """Reshape the wallet export's ledger into the cashier app's schema.
+
+    One output row per movement — deliberately not aggregated — filtered to the
+    season starting at ``since``. The source is the ``Manipulations du
+    portefeuille`` sheet of the multi-sheet financial workbook; its columns are
+    ``Date | Auteur | Manipulation | Montant | Frais | Total``. ``Auteur`` is
+    dropped, the amounts are kept as native numbers, and ``Type``/``Tournoi``
+    are derived from the ``Manipulation`` prose.
+    """
+    assert_xlsx(content)
+
+    from openpyxl import load_workbook
+
+    workbook = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    try:
+        wanted = normalize(MANIP_SHEET)
+        title = next((t for t in workbook.sheetnames if normalize(t) == wanted), None)
+        if title is None:
+            raise ValueError(
+                f"Wallet workbook has no {MANIP_SHEET!r} sheet. Sheets: {workbook.sheetnames}"
+            )
+        grid = list(workbook[title].iter_rows(values_only=True))
+    finally:
+        workbook.close()
+
+    header_at = next(
+        (i for i, row in enumerate(grid)
+         if [normalize(c) for c in (row or [])[:6]]
+         == ["date", "auteur", "manipulation", "montant", "frais", "total"]),
+        None,
+    )
+    if header_at is None:
+        raise ValueError("Wallet ledger header (Date/Auteur/Manipulation/…) not found")
+
+    out, seen = [], 0
+    for row in grid[header_at + 1:]:
+        cells = list(row or [])
+        date_cell = cells[0] if len(cells) > 0 else None
+        manip = cells[2] if len(cells) > 2 else None
+        # The footer totals row and the trailing blank spacers carry no date.
+        if date_cell in (None, "") or normalize(date_cell) == "total" or not manip:
+            continue
+        seen += 1
+        day = _parse_fr_date(date_cell)
+        if day < since:
+            continue
+        kind = classify_manipulation(manip)
+        out.append([
+            day.isoformat(),
+            kind,
+            str(manip),
+            cells[3] if len(cells) > 3 else "",
+            cells[4] if len(cells) > 4 else "",
+            cells[5] if len(cells) > 5 else "",
+            extract_tournoi(manip, kind),
+        ])
+
+    if not seen:
+        raise ValueError("Wallet ledger has no data rows; refusing to clear the sheet")
+    logging.info("Wallet ledger: %d movement(s) in season (of %d total)", len(out), seen)
+    return [list(PORTEFEUILLE_HEADER)] + out
 
 
 def diff_rows(old, new):
@@ -329,6 +480,9 @@ class BadnetUpdate:
         self.gmail_app_password = cfg["GMAIL_APP_PASSWORD"]
         self.sheet_id = cfg["GOOGLE_SHEETS_ID"]
         self.sheet_name = cfg["GOOGLE_SHEET_NAME"]
+        self.portefeuille_sheet_name = (
+            cfg.get("PORTEFEUILLE_SHEET_NAME") or PORTEFEUILLE_SHEET_DEFAULT
+        )
         self.timeout = int(cfg.get("BADNET_2FA_TIMEOUT") or DEFAULT_2FA_TIMEOUT)
         # Optional: the season the export button advertises is used otherwise.
         self.season = cfg.get("BADNET_SEASON") or None
@@ -340,12 +494,33 @@ class BadnetUpdate:
 
     async def handle(self, scope, receive, send):
         try:
-            rows = read_export(await self._fetch_export())
-            body = json.dumps(self._update_sheet(rows), ensure_ascii=False).encode()
-            status, content_type = 200, b"application/json"
+            downloads = await self._fetch_all()
         except Exception as e:
-            logging.exception("Failed to update the tournament sheet")
+            # A login/session failure sinks both syncs; nothing else ran.
+            logging.exception("Badnet authentication failed; neither sheet updated")
             status, content_type, body = 500, b"text/plain", str(e).encode()
+        else:
+            results, status = {}, 200
+            since = season_start(self._now())
+            syncs = [
+                ("tournoi", self.sheet_name, False,
+                 lambda c: read_export(c)),
+                ("portefeuille", self.portefeuille_sheet_name, True,
+                 lambda c: portefeuille_rows(c, since)),
+            ]
+            for key, sheet_name, create, decode in syncs:
+                content = downloads[key]
+                try:
+                    if isinstance(content, Exception):
+                        raise content
+                    rows = decode(content)
+                    results[key] = self._update_sheet(rows, sheet_name, create_missing=create)
+                except Exception as e:
+                    logging.exception("Failed to update the %s sheet", key)
+                    results[key] = {"error": str(e)}
+                    status = 207  # partial success — the other sync may still be fine
+            content_type = b"application/json"
+            body = json.dumps(results, ensure_ascii=False).encode()
 
         await send({"type": "http.response.start", "status": status,
                     "headers": [[b"content-type", content_type]]})
@@ -362,17 +537,44 @@ class BadnetUpdate:
 
     # -- scrape ------------------------------------------------------------
 
-    async def _fetch_export(self):
+    async def _fetch_all(self):
+        """Log in once, then download both exports in the same session.
+
+        Sharing one ``_login`` is what keeps the run to a single 2FA email. Each
+        download is isolated: a broken chain is captured as its own value so one
+        failed export cannot sink the other. A login failure, by contrast,
+        propagates — nothing could have run.
+        """
         client = self._client()
         try:
             shell = await self._login(client)
-            stats = await self._ic_click(client, shell, STATISTIQUES_LABEL)
-            download = await self._ic_click(client, stats.text, EXPORT_LABEL)
-            logging.info("Downloaded export: %d bytes (%s)", len(download.content),
-                         download.headers.get("content-type"))
-            return download.content
+            downloads = {}
+            for key, labels in (("tournoi", TOURNOI_LABELS),
+                                 ("portefeuille", PORTEFEUILLE_LABELS)):
+                try:
+                    download = await self._navigate_chain(client, shell, labels)
+                    logging.info("Downloaded %s export: %d bytes (%s)", key,
+                                 len(download.content),
+                                 download.headers.get("content-type"))
+                    downloads[key] = download.content
+                except Exception as e:
+                    logging.exception("Failed to download the %s export", key)
+                    downloads[key] = e
+            return downloads
         finally:
             await client.aclose()
+
+    async def _navigate_chain(self, client, html, labels):
+        """Follow a sequence of ic-click labels; return the final response.
+
+        Intermediate hops are HTML pages feeding the next hop; the last hop is
+        the download itself (non-HTML), whose ``.text`` is never consumed.
+        """
+        resp = None
+        for label in labels:
+            resp = await self._ic_click(client, html, label)
+            html = resp.text
+        return resp
 
     async def _login(self, client):
         """Authenticate and return the app shell's HTML."""
@@ -548,18 +750,27 @@ class BadnetUpdate:
 
     # -- Google Sheet -------------------------------------------------------
 
-    def _update_sheet(self, rows):
-        """Replace the target tab with ``rows`` and report what changed."""
+    def _update_sheet(self, rows, sheet_name, *, create_missing=False):
+        """Replace ``sheet_name`` with ``rows`` and report what changed.
+
+        With ``create_missing`` the tab is added when absent (the wallet tab need
+        not be set up by hand); otherwise a missing tab is a loud error naming
+        the tabs that do exist.
+        """
         spreadsheet = self.sheet.spreadsheets().get(spreadsheetId=self.sheet_id).execute()
-        meta = next((s for s in spreadsheet["sheets"]
-                     if s["properties"]["title"] == self.sheet_name), None)
+        meta = _find_tab(spreadsheet, sheet_name)
+        if meta is None and create_missing:
+            logging.info("Creating missing sheet tab %r", sheet_name)
+            self._batch([{"addSheet": {"properties": {"title": sheet_name}}}])
+            spreadsheet = self.sheet.spreadsheets().get(spreadsheetId=self.sheet_id).execute()
+            meta = _find_tab(spreadsheet, sheet_name)
         if meta is None:
             titles = [s["properties"]["title"] for s in spreadsheet["sheets"]]
-            raise ValueError(f"Sheet tab {self.sheet_name!r} not found. Tabs: {titles}")
+            raise ValueError(f"Sheet tab {sheet_name!r} not found. Tabs: {titles}")
 
         sheet_id = meta["properties"]["sheetId"]
         api = self.sheet.spreadsheets().values()
-        old = api.get(spreadsheetId=self.sheet_id, range=self.sheet_name).execute()
+        old = api.get(spreadsheetId=self.sheet_id, range=sheet_name).execute()
         old_rows = old.get("values", [])
 
         requests = [{"deleteTable": {"tableId": t["tableId"]}} for t in meta.get("tables", [])]
@@ -574,18 +785,18 @@ class BadnetUpdate:
         # deleteTable wipes cell data, so both must precede the write.
         self._batch(requests)
 
-        api.clear(spreadsheetId=self.sheet_id, range=self.sheet_name).execute()
-        api.update(spreadsheetId=self.sheet_id, range=f"{self.sheet_name}!A1",
+        api.clear(spreadsheetId=self.sheet_id, range=sheet_name).execute()
+        api.update(spreadsheetId=self.sheet_id, range=f"{sheet_name}!A1",
                    valueInputOption="RAW", body={"values": rows}).execute()
 
         self._batch([{"addTable": {"table": {
-            "name": self.sheet_name,
+            "name": sheet_name,
             "range": {"sheetId": sheet_id, "startRowIndex": 0, "endRowIndex": len(rows),
                       "startColumnIndex": 0, "endColumnIndex": len(rows[0])}}}}])
 
         diff = diff_rows(old_rows, rows)
         logging.info("Updated sheet %r with %d data rows: %d added, %d removed",
-                     self.sheet_name, diff["total"], diff["added"], diff["removed"])
+                     sheet_name, diff["total"], diff["added"], diff["removed"])
         return diff
 
     def _batch(self, requests):
@@ -593,6 +804,12 @@ class BadnetUpdate:
             self.sheet.spreadsheets().batchUpdate(
                 spreadsheetId=self.sheet_id, body={"requests": requests}
             ).execute()
+
+
+def _find_tab(spreadsheet, title):
+    """The sheet metadata for the tab named ``title``, or None."""
+    return next((s for s in spreadsheet["sheets"]
+                 if s["properties"]["title"] == title), None)
 
 
 def _build_sheets(sa_info):
